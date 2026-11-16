@@ -1,7 +1,6 @@
 """
 order_processor.py
-Main business processing module for Campus Café System.
-Contains intentional code smells for structural analysis.
+Main order processing, tax calculation, discounting, and receipt formatting module.
 """
 
 from typing import List, Dict, Any
@@ -11,36 +10,28 @@ from models import (
 
 
 class Order:
-    """Helper container linking customer and items."""
+    """Container linking a customer account with ordered items."""
     def __init__(self, customer: CustomerAccount, items: List[OrderItem]):
         self.customer = customer
         self.items = items
 
 
 class OrderProcessor:
-    """
-    SMELL 2: Large Class
-    God object responsible for calculation, payment routing, formatting,
-    discount evaluation, customer internal modification, and tax calculation.
-    """
+    """Handles checkout processing, discounts, tax rules, receipts, and loyalty updates."""
     def __init__(self, gateway_type: str = "stripe"):
         self.gateway_type = gateway_type
         self.stripe = StripeGateway()
         self.paypal = PayPalGateway()
         self.order_history: List[Dict[str, Any]] = []
 
-    def process_customer_order(self, order: Order, payment_method: str, is_student: bool, 
+    def process_customer_order(self, order: Order, payment_method: str, is_student: bool,
                                is_faculty: bool, promo_code: str, custom_tax_override: float = -1.0) -> Dict[str, Any]:
-        """
-        SMELL 1: Long Method
-        Monolithic method handling pricing, tax, discounts, payment, logging, and receipt formatting.
-        """
         # 1. Calculate subtotal
         subtotal = 0.0
         for item in order.items:
             subtotal += item.price * item.quantity
 
-        # 2. Tax calculations using switch logic
+        # 2. Calculate applicable taxes
         tax = 0.0
         if custom_tax_override >= 0.0:
             tax = subtotal * custom_tax_override
@@ -48,7 +39,7 @@ class OrderProcessor:
             for item in order.items:
                 tax += self.apply_tax_by_type(item)
 
-        # 3. Apply discounts based on parameter flags
+        # 3. Apply eligibility and promo discounts
         discount = 0.0
         if is_student:
             discount += subtotal * 0.10
@@ -65,17 +56,17 @@ class OrderProcessor:
 
         final_total = subtotal + tax - discount
 
-        # 4. Process Payment using alternative classes
+        # 4. Process payment through selected gateway
         payment_success = False
         if payment_method.lower() == "stripe":
             payment_success = self.stripe.charge(final_total)
         elif payment_method.lower() == "paypal":
             payment_success = self.paypal.send_payment(final_total)
 
-        # 5. Record internal customer data
+        # 5. Update customer loyalty score
         self.adjust_customer_internals(order.customer, int(final_total))
 
-        # 6. Generate execution result
+        # 6. Record and return transaction summary
         result = {
             "customer_name": order.customer.name,
             "subtotal": subtotal,
@@ -87,13 +78,9 @@ class OrderProcessor:
         self.order_history.append(result)
         return result
 
-    def calculate_custom_discount(self, base_price: float, is_student: bool, is_faculty: bool, 
-                                  is_senior: bool, is_military: bool, has_coupon: bool, 
+    def calculate_custom_discount(self, base_price: float, is_student: bool, is_faculty: bool,
+                                  is_senior: bool, is_military: bool, has_coupon: bool,
                                   day_of_week: str, time_of_day: int) -> float:
-        """
-        SMELL 4: Long Parameter List
-        Takes 8 primitive parameters to calculate a discount percentage.
-        """
         rate = 0.0
         if is_student:
             rate += 0.10
@@ -112,12 +99,6 @@ class OrderProcessor:
         return base_price * min(rate, 0.50)
 
     def apply_tax_by_type(self, item: OrderItem) -> float:
-        """
-        SMELL 6: Switch Statements
-        Sequence of if-elif-else statements acting on category strings.
-        
-        SMELL 11 / 12 Impact: Standard tax rate 0.08 used here.
-        """
         category = item.category.lower()
         if category == "prepared_food":
             return item.price * item.quantity * 0.08
@@ -131,16 +112,12 @@ class OrderProcessor:
             return item.price * item.quantity * 0.05
 
     def format_receipt_standard(self, order: Order) -> str:
-        """
-        SMELL 14: Duplicate Code (Part 1)
-        Contains duplicated subtotal and tax code matching format_receipt_express.
-        """
         subtotal = 0.0
         for item in order.items:
             subtotal += item.price * item.quantity
         tax = subtotal * 0.08
         total = subtotal + tax
-        
+
         lines = [f"--- STANDARD RECEIPT ---", f"Customer: {order.customer.name}"]
         for item in order.items:
             lines.append(f"{item.name} x{item.quantity}: ${item.price * item.quantity:.2f}")
@@ -150,16 +127,12 @@ class OrderProcessor:
         return "\n".join(lines)
 
     def format_receipt_express(self, order: Order) -> str:
-        """
-        SMELL 14: Duplicate Code (Part 2)
-        Identical calculation logic duplicated from format_receipt_standard.
-        """
         subtotal = 0.0
         for item in order.items:
             subtotal += item.price * item.quantity
         tax = subtotal * 0.08
         total = subtotal + tax
-        
+
         lines = [f"--- EXPRESS RECEIPT ---", f"Customer: {order.customer.name}"]
         for item in order.items:
             lines.append(f"{item.name} x{item.quantity}: ${item.price * item.quantity:.2f}")
@@ -169,39 +142,24 @@ class OrderProcessor:
         return "\n".join(lines)
 
     def compute_item_savings(self, item: OrderItem, MSRP: float) -> float:
-        """
-        SMELL 19: Feature Envy
-        Accesses OrderItem properties repeatedly rather than delegating logic to OrderItem.
-        """
         item_total_cost = item.price * item.quantity
         msrp_total_cost = MSRP * item.quantity
         return msrp_total_cost - item_total_cost
 
     def adjust_customer_internals(self, customer: CustomerAccount, added_points: int) -> None:
-        """
-        SMELL 20: Inappropriate Intimacy
-        Directly reads and writes private members _loyalty_score and _internal_notes of CustomerAccount.
-        """
         customer._loyalty_score += added_points
         customer._internal_notes.append(f"Added {added_points} points via OrderProcessor.")
 
     def get_customer_zip_code(self, order: Order) -> str:
-        """
-        SMELL 21: Message Chains
-        Navigates a long chain of objects: order.customer.address_info.zip_code.
-        """
         return order.customer.address_info.zip_code
 
 
 class OrderProcessorMiddleMan:
-    """
-    SMELL 22: Middle Man
-    Delegates calls directly to an underlying OrderProcessor instance without adding functionality.
-    """
+    """Service wrapper exposing OrderProcessor operations to external controllers."""
     def __init__(self, processor: OrderProcessor):
         self.processor = processor
 
-    def process_customer_order(self, order: Order, payment_method: str, is_student: bool, 
+    def process_customer_order(self, order: Order, payment_method: str, is_student: bool,
                                is_faculty: bool, promo_code: str, custom_tax_override: float = -1.0) -> Dict[str, Any]:
         return self.processor.process_customer_order(order, payment_method, is_student, is_faculty, promo_code, custom_tax_override)
 
