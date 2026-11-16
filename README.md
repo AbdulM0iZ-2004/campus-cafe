@@ -1,17 +1,12 @@
+# Campus Café Ordering & Loyalty System
 
-# Campus Café Ordering System — 22 Code Smells
-
-A Python codebase demonstrating all 22 classic object-oriented code smells across five categories (Bloaters, Object-Orientation Abusers, Change Preventers, Dispensables, and Couplers).
+A lightweight Python backend for managing university campus café orders, menu categories, promotional discounts, tax rules, payment processing, and customer loyalty points.
 
 ## Project Structure
 
-- `models.py` — Domain models (Data Class, Primitive Obsession, Data Clumps, Temporary Field, Refused Bequest, Alternative Classes with Different Interfaces, Parallel Inheritance Hierarchies)
-- `order_processor.py` — Core order workflow (Large Class, Long Method, Long Parameter List, Switch Statements, Duplicate Code, Feature Envy, Inappropriate Intimacy, Message Chains, Middle Man)
-- `legacy_helpers.py` — Legacy utilities (Divergent Change, Shotgun Surgery, Comments, Lazy Class, Dead Code, Speculative Generality)
-- `test_cafe_system.py` — Unit test suite verifying runtime behavior across all 22 smells
-
-## Running the Tests
-
-```bash
-python -m unittest test_cafe_system.py
-```
+```text
+campus-cafe-ordering/
+├── models.py             # Domain entities (customers, addresses, menu items, payment gateways)
+├── order_processor.py    # Checkout workflow, tax rules, discounts, and receipt formatting
+├── legacy_helpers.py     # Legacy audit logging, tax utilities, and loyalty point helpers
+└── test_cafe_system.py   # Unit test suite
